@@ -24,16 +24,16 @@ jobs:
         run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Generate Gradle wrapper
+        working-directory: app
         run: |
           gradle wrapper --gradle-version=8.7 --distribution-type=bin
+          chmod +x gradlew
 
       - name: Clean CMake cache
-        run: rm -rf app/.cxx app/build/intermediates/cxx
-
-      - name: Grant Gradle permissions
-        run: chmod +x gradlew
+        run: rm -rf app/.cxx app/.cxx_build app/build/intermediates/cxx
 
       - name: Build APK
+        working-directory: app
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK
