@@ -60,7 +60,7 @@ public class EspRenderer extends SurfaceView implements SurfaceHolder.Callback {
                     c = holder.lockCanvas();
                     if (c != null) {
                         c.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR);
-                        draw(c);
+                        drawEsp(c);
                     }
                 } finally { if (c != null) holder.unlockCanvasAndPost(c); }
                 try { Thread.sleep(16); } catch (InterruptedException ignored) {}
@@ -68,7 +68,7 @@ public class EspRenderer extends SurfaceView implements SurfaceHolder.Callback {
         }
     }
 
-    private void draw(Canvas c) {
+    private void drawEsp(Canvas c) {
         float[] d = sData;
         if (d == null || d.length < STRIDE) return;
         int n = d.length / STRIDE;
