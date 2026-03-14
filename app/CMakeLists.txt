@@ -1,35 +1,44 @@
-cmake_minimum_required(VERSION 3.10.2)
-
+cmake_minimum_required(VERSION 3.22.1)
 project("modmenu")
 
-# --- FLAGS DE COMPILACIÓN ---
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fexceptions -frtti")
-
-# --- DIRECTORIOS DE CABECERA ---
-include_directories(
-    src/
-    dobby/include/
+# ── Dobby desde fuente (NDK lo compila correctamente para arm64-v8a) ──────────
+include(FetchContent)
+FetchContent_Declare(
+    Dobby
+    GIT_REPOSITORY https://github.com/jmpews/Dobby.git
+    GIT_TAG        main
+    GIT_SHALLOW    TRUE
+    GIT_PROGRESS   FALSE
 )
+set(DOBBY_BUILD_SHARED       OFF CACHE BOOL "" FORCE)
+set(Plugin.Darwin.Dyld       OFF CACHE BOOL "" FORCE)
+set(Plugin.Darwin.ObjectiveC OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(Dobby)
 
-# --- FUENTES DEL MOD ---
+# ── Módulo principal ──────────────────────────────────────────────────────────
 add_library(modmenu SHARED
     src/Main.cpp
     src/MemoryUtils.cpp
 )
 
-# --- DEFINICIÓN DE RUTA DE DOBBY ---
-set(DOBBY_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dobby/${ANDROID_ABI}/libdobby.a)
+target_include_directories(modmenu PRIVATE
+    src/
+    ${dobby_SOURCE_DIR}/include   # provee dobby.h real
+)
 
-# --- LIBRERÍAS DE ANDROID ---
-find_library(log-lib log)
-find_library(android-lib android)
+target_compile_features(modmenu PRIVATE cxx_std_17)
 
-# --- LINKER (Forzado) ---
+target_compile_options(modmenu PRIVATE
+    -fvisibility=hidden
+    -fexceptions
+    -frtti
+    -Wno-error=format-security
+    -O2
+)
+
 target_link_libraries(modmenu
-    ${log-lib}
-    ${android-lib}
-    ${DOBBY_LIB_PATH} # Pasamos el archivo .a directamente
+    dobby
+    android
+    log
     atomic
-    m
 )
