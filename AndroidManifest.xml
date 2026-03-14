@@ -14,11 +14,15 @@
     <application
         android:allowBackup="false"
         android:label="FF Mod"
-        android:theme="@android:style/Theme.NoDisplay">
+        android:theme="@android:style/Theme.Translucent.NoTitleBar">
 
+        <!-- Theme.Translucent.NoTitleBar en vez de Theme.NoDisplay -->
+        <!-- NoDisplay obliga a llamar finish() antes del fin del ciclo -->
+        <!-- Translucent es invisible igual pero no crashea -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
