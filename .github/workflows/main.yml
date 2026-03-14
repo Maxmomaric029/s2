@@ -34,9 +34,6 @@ jobs:
 
       - name: Build APK
         working-directory: ModMenuFF
-        env:
-          # Usa el SDK de Android ya instalado en el runner, sin NDK externo
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
         run: |
           if [ ! -f gradlew ]; then
             gradle wrapper
