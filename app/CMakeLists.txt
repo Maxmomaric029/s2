@@ -31,6 +31,7 @@ find_library(android-lib android)
 target_link_libraries(modmenu
     ${log-lib}
     ${android-lib}
-    dobby_lib
+    -Wl,--whole-archive dobby_lib -Wl,--no-whole-archive
     atomic
+    m
 )
