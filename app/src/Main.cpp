@@ -256,9 +256,18 @@ static void hook_Update(void* instance) {
 //  HILO DE INICIALIZACIÓN
 // =============================================================================
 static void* hack_thread(void*) {
-    LOGD("Esperando libil2cpp.so...");
+    LOGD("Buscando proceso com.dts.freefireth...");
+
+    // Buscar el PID del proceso de Free Fire
+    while (MemoryUtils::targetPid <= 0) {
+        MemoryUtils::targetPid = MemoryUtils::findProcessPid("com.dts.freefireth");
+        if (MemoryUtils::targetPid <= 0) sleep(2);
+    }
+    LOGD("PID encontrado: %d", MemoryUtils::targetPid);
+
+    // Leer la base de libil2cpp.so desde el espacio de memoria de FF
     while ((gBase = MemoryUtils::getLibraryBase("libil2cpp.so")) == 0) sleep(1);
-    LOGD("Base: %p", reinterpret_cast<void*>(gBase));
+    LOGD("Base libil2cpp.so: %p", reinterpret_cast<void*>(gBase));
 
     if (Global.Player_Update_Func == 0x0) {
         LOGE("Player_Update_Func = 0x0 en Global.h — hook omitido. Pon el offset real.");
