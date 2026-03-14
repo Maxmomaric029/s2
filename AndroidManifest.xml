@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- package= removido: se define en build.gradle como namespace -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <!-- Necesario para getLaunchIntentForPackage en Android 11+ -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission"
+        xmlns:tools="http://schemas.android.com/tools"/>
+
+    <!-- Declarar qué app queremos lanzar -->
+    <queries>
+        <package android:name="com.dts.freefiremax"/>
+    </queries>
 
     <application
         android:allowBackup="false"
