@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.22.1)
 project("modmenu")
 
-# Sin dependencias externas — InlineHook.h reemplaza Dobby
 add_library(modmenu SHARED
     src/Main.cpp
     src/MemoryUtils.cpp
