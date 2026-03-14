@@ -20,28 +20,20 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Set up Android SDK licenses
-        run: |
-          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Clean CMake cache (fuerza reconfiguración limpia)
-        run: |
-          rm -rf ModMenuFF/app/.cxx
-          rm -rf ModMenuFF/app/build/intermediates/cxx
+      - name: Clean CMake cache
+        run: rm -rf app/.cxx app/build/intermediates/cxx
 
-      - name: Change Permissions
-        run: chmod +x ModMenuFF/gradlew || true
+      - name: Grant Gradle permissions
+        run: chmod +x gradlew || true
 
       - name: Build APK
-        working-directory: ModMenuFF
-        run: |
-          if [ ! -f gradlew ]; then
-            gradle wrapper
-          fi
-          ./gradlew assembleRelease --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: mod-menu-apk
-          path: ModMenuFF/app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/release/*.apk
