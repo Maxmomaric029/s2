@@ -16,9 +16,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         if (!Settings.canDrawOverlays(this)) {
-            // Pedir permiso primero
             startActivityForResult(new Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:" + getPackageName())
@@ -31,9 +29,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         if (req == REQUEST_OVERLAY) {
-            if (Settings.canDrawOverlays(this)) {
-                launchAndWait();
-            } else {
+            if (Settings.canDrawOverlays(this)) launchAndWait();
+            else {
                 Toast.makeText(this, "Permiso overlay requerido.", Toast.LENGTH_LONG).show();
                 finish();
             }
@@ -41,7 +38,7 @@ public class MainActivity extends Activity {
     }
 
     private void launchAndWait() {
-        // 1. Abrir Free Fire primero
+        // Abrir Free Fire primero
         try {
             Intent ff = getPackageManager()
                 .getLaunchIntentForPackage("com.dts.freefireth");
@@ -51,10 +48,10 @@ public class MainActivity extends Activity {
             }
         } catch (Exception ignored) {}
 
-        // 2. Esperar 10 segundos y recién ahí arrancar el overlay
+        // Esperar 10s y arrancar el overlay
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             startService(new Intent(this, OverlayService.class));
-            finish(); // cerrar la Activity, el Service sigue vivo
+            finish(); // OBLIGATORIO con Theme.Translucent
         }, 10_000);
     }
 }
