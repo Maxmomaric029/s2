@@ -1,3 +1,4 @@
+#include "InlineHook.h"
 #include <jni.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -10,7 +11,6 @@
 #include "MemoryUtils.h"
 #include "Menu.h"
 #include "ESP.h"
-#include "InlineHook.h"
 
 #define TAG "ModMenu"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
