@@ -10,16 +10,8 @@
 #include "Menu.h"
 #include "ESP.h"
 
-// --- DOBBY HOOK EXTERNAL ---
-#ifdef __cplusplus
-extern "C" {
-#endif
-    #include "dobby.h"
-    // Si dobby.h no define DobbyHook directamente, lo declaramos nosotros:
-    int DobbyHook(void *address, void *replace, void **origin);
-#ifdef __cplusplus
-}
-#endif
+// --- DOBBY HOOK EXTERNAL (Solo incluir el header ya que tiene extern "C") ---
+#include "dobby.h"
 
 // Inicialización de la base estática
 uintptr_t MemoryUtils::libBase = 0;

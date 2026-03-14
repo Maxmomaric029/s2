@@ -12,26 +12,24 @@ include_directories(
     dobby/include/
 )
 
-# --- LIBRERÍA DOBBY (Precompilada) ---
-add_library(dobby_lib STATIC IMPORTED)
-set_target_properties(dobby_lib PROPERTIES IMPORTED_LOCATION
-    ${CMAKE_CURRENT_SOURCE_DIR}/dobby/${ANDROID_ABI}/libdobby.a)
-
 # --- FUENTES DEL MOD ---
 add_library(modmenu SHARED
     src/Main.cpp
     src/MemoryUtils.cpp
 )
 
+# --- DEFINICIÓN DE RUTA DE DOBBY ---
+set(DOBBY_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dobby/${ANDROID_ABI}/libdobby.a)
+
 # --- LIBRERÍAS DE ANDROID ---
 find_library(log-lib log)
 find_library(android-lib android)
 
-# --- LINKER ---
+# --- LINKER (Forzado) ---
 target_link_libraries(modmenu
     ${log-lib}
     ${android-lib}
-    -Wl,--whole-archive dobby_lib -Wl,--no-whole-archive
+    ${DOBBY_LIB_PATH} # Pasamos el archivo .a directamente
     atomic
     m
 )
