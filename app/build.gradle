@@ -4,10 +4,12 @@ plugins {
 
 android {
     compileSdk 34
-    namespace "com.dts.freefiremax"   // namespace definido acá, no en el manifest
+    namespace "com.modmenu.ffmax"
 
     defaultConfig {
-        applicationId "com.dts.freefiremax"
+        // Nombre ÚNICO — diferente al paquete de Free Fire (com.dts.freefireth)
+        // para que no choque al instalar
+        applicationId "com.modmenu.ffmax"
         minSdk 26
         targetSdk 34
         versionCode 1
@@ -27,6 +29,7 @@ android {
         cmake {
             path "CMakeLists.txt"
             version "3.22.1"
+            buildStagingDirectory ".cxx_build"
         }
     }
 
