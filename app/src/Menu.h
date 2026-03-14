@@ -3,13 +3,16 @@
 
 class Menu {
 public:
-    inline static bool aimbot = false;
-    inline static bool esp = false;
+    // C++17 inline static — sin errores de definición múltiple
+    inline static bool aimbot    = false;
+    inline static bool esp       = false;
     inline static bool silentAim = false;
-    inline static bool noRecoil = false;
+    inline static bool noRecoil  = false;
     inline static bool fovCircle = false;
-    inline static float fov = 180.0f;
-    inline static float smoothing = 5.0f;
+
+    // Configuración del aimbot
+    inline static float fov       = 180.0f; // Radio de búsqueda en píxeles
+    inline static float smoothing = 5.0f;   // 1.0 = instantáneo, mayor = más suave
 };
 
-#endif
+#endif // ANDROID_MOD_MENU_MENU_H
