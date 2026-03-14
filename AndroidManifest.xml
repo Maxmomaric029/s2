@@ -1,21 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <!-- Necesario para getLaunchIntentForPackage en Android 11+ -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission"
-        xmlns:tools="http://schemas.android.com/tools"/>
+        tools:ignore="QueryAllPackagesPermission"/>
 
-    <!-- Declarar qué app queremos lanzar -->
     <queries>
-        <package android:name="com.dts.freefiremax"/>
+        <package android:name="com.dts.freefireth"/>
     </queries>
 
     <application
         android:allowBackup="false"
-        android:label="FF Max Mod"
+        android:label="FF Mod"
         android:theme="@android:style/Theme.NoDisplay">
 
         <activity

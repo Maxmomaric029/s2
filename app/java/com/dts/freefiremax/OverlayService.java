@@ -1,4 +1,4 @@
-package com.dts.freefiremax;
+package com.dts.freefireth;
 
 import android.app.Service;
 import android.content.Intent;
@@ -172,7 +172,7 @@ public class OverlayService extends Service {
     private void launchFreeFire() {
         try {
             Intent launch = getPackageManager()
-                .getLaunchIntentForPackage("com.dts.freefiremax");
+                .getLaunchIntentForPackage("com.dts.freefireth");
             if (launch != null) {
                 launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(launch);

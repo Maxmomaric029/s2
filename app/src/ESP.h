@@ -34,7 +34,7 @@ namespace EspBridge {
     // Llamar una vez desde JNI_OnLoad
     inline void Init(JNIEnv* env, JavaVM* vm) {
         gJvm = vm;
-        jclass local = env->FindClass("com/dts/freefiremax/EspRenderer");
+        jclass local = env->FindClass("com/dts/freefireth/EspRenderer");
         if (!local) return;
         gEspClass    = reinterpret_cast<jclass>(env->NewGlobalRef(local));
         gUpdateMethod = env->GetStaticMethodID(

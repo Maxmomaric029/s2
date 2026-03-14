@@ -1,4 +1,4 @@
-package com.dts.freefiremax;
+package com.dts.freefireth;
 
 import android.app.Activity;
 import android.content.Intent;

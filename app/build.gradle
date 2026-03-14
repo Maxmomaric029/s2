@@ -4,7 +4,7 @@ plugins {
 
 android {
     compileSdk 34
-    namespace "com.dts.freefiremax"
+    namespace "com.dts.freefiremax"   // namespace definido acá, no en el manifest
 
     defaultConfig {
         applicationId "com.dts.freefiremax"
@@ -27,7 +27,6 @@ android {
         cmake {
             path "CMakeLists.txt"
             version "3.22.1"
-            buildStagingDirectory ".cxx_build"
         }
     }
 

@@ -1,4 +1,4 @@
-package com.dts.freefiremax;
+package com.dts.freefireth;
 
 public class NativeLib {
     static { System.loadLibrary("modmenu"); }

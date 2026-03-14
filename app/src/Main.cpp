@@ -1,4 +1,3 @@
-#include "InlineHook.h"
 #include <jni.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -11,6 +10,7 @@
 #include "MemoryUtils.h"
 #include "Menu.h"
 #include "ESP.h"
+#include "InlineHook.h"
 
 #define TAG "ModMenu"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
@@ -279,7 +279,7 @@ static void* hack_thread(void*) {
 //  JNI EXPORTS
 // =============================================================================
 extern "C" JNIEXPORT void JNICALL
-Java_com_dts_freefiremax_NativeLib_toggleFeature(JNIEnv*, jclass, jint id, jboolean val) {
+Java_com_dts_freefireth_NativeLib_toggleFeature(JNIEnv*, jclass, jint id, jboolean val) {
     switch (id) {
         case 0: Menu::aimbot    = val; break;
         case 1: Menu::esp       = val; break;
@@ -290,13 +290,13 @@ Java_com_dts_freefiremax_NativeLib_toggleFeature(JNIEnv*, jclass, jint id, jbool
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_dts_freefiremax_NativeLib_setAimbotParam(JNIEnv*, jclass, jint id, jfloat val) {
+Java_com_dts_freefireth_NativeLib_setAimbotParam(JNIEnv*, jclass, jint id, jfloat val) {
     if (id == 0) Menu::fov       = val;
     if (id == 1) Menu::smoothing = val;
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_dts_freefiremax_NativeLib_setScreenSize(JNIEnv*, jclass, jint w, jint h) {
+Java_com_dts_freefireth_NativeLib_setScreenSize(JNIEnv*, jclass, jint w, jint h) {
     gScreenW = static_cast<float>(w);
     gScreenH = static_cast<float>(h);
 }
