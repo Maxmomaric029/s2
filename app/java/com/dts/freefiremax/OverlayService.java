@@ -2,9 +2,12 @@ package com.dts.freefiremax;
 
 import android.app.Service;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -23,13 +26,14 @@ public class OverlayService extends Service {
     private View          fabBtn;
     private View          menuPanel;
     private EspRenderer   espView;
-    private boolean       menuOpen = false;
+    private boolean       menuOpen   = false;
+    private boolean       espAdded   = false;
+    private final Handler handler    = new Handler(Looper.getMainLooper());
 
-    // Estados
-    private boolean bAimbot    = false;
-    private boolean bEsp       = false;
-    private boolean bSilent    = false;
-    private boolean bNoRecoil  = false;
+    private boolean bAimbot   = false;
+    private boolean bEsp      = false;
+    private boolean bSilent   = false;
+    private boolean bNoRecoil = false;
     private float   fSmoothing = 5f;
     private float   fFov       = 180f;
 
@@ -40,40 +44,25 @@ public class OverlayService extends Service {
         super.onCreate();
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
 
-        // Pasar resolución real a C++
         DisplayMetrics dm = new DisplayMetrics();
         wm.getDefaultDisplay().getRealMetrics(dm);
         NativeLib.setScreenSize(dm.widthPixels, dm.heightPixels);
 
-        buildEspOverlay();
         buildFab();
         buildMenu();
+        // EspRenderer se agrega solo cuando el usuario activa ESP
+        // para no crashear antes de que el juego cargue
     }
 
-    // ── ESP SurfaceView (capa más baja, no intercepta toques) ─────────────────
-    private void buildEspOverlay() {
-        espView = new EspRenderer(this);
-        WindowManager.LayoutParams p = new WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSPARENT
-        );
-        wm.addView(espView, p);
-    }
-
-    // ── Botón flotante ────────────────────────────────────────────────────────
+    // ── FAB ───────────────────────────────────────────────────────────────────
     private void buildFab() {
         TextView btn = new TextView(this);
-        btn.setText("FF");
+        btn.setText("FF\nMOD");
         btn.setTextColor(Color.WHITE);
-        btn.setTextSize(11f);
+        btn.setTextSize(10f);
         btn.setGravity(android.view.Gravity.CENTER);
         btn.setBackgroundColor(Color.parseColor("#CC0A0A1A"));
-        btn.setPadding(18, 10, 18, 10);
+        btn.setPadding(16, 10, 16, 10);
         fabBtn = btn;
 
         WindowManager.LayoutParams p = new WindowManager.LayoutParams(
@@ -84,29 +73,29 @@ public class OverlayService extends Service {
             PixelFormat.TRANSLUCENT
         );
         p.gravity = Gravity.TOP | Gravity.START;
-        p.x = 8; p.y = 220;
+        p.x = 8; p.y = 200;
 
-        makeDraggable(fabBtn, p, () -> toggleMenu());
+        makeDraggable(fabBtn, p, this::toggleMenu);
         wm.addView(fabBtn, p);
     }
 
-    // ── Panel del menú ────────────────────────────────────────────────────────
+    // ── MENÚ ──────────────────────────────────────────────────────────────────
     private void buildMenu() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#F0000010"));
-        root.setPadding(20, 20, 20, 20);
+        root.setBackgroundColor(Color.parseColor("#EE000015"));
+        root.setPadding(22, 22, 22, 22);
 
         // Título
         TextView title = new TextView(this);
-        title.setText("FREE FIRE MAX  |  MOD MENU");
+        title.setText("FREE FIRE MAX — MOD MENU");
         title.setTextColor(Color.parseColor("#FF4C8C"));
-        title.setTextSize(13f);
-        title.setPadding(0, 0, 0, 14);
+        title.setTextSize(12f);
+        title.setPadding(0, 0, 0, 12);
         root.addView(title);
 
-        // Sección: Combat
+        // COMBAT
         root.addView(sectionLabel("COMBAT"));
         root.addView(makeSwitch("Aimbot", bAimbot, v -> {
             bAimbot = v; NativeLib.toggleFeature(0, v);
@@ -118,40 +107,48 @@ public class OverlayService extends Service {
             bNoRecoil = v; NativeLib.toggleFeature(3, v);
         }));
 
-        // Sección: Visual
+        // VISUAL
         root.addView(sectionLabel("VISUAL"));
-        root.addView(makeSwitch("ESP  (caja + distancia)", bEsp, v -> {
-            bEsp = v; NativeLib.toggleFeature(1, v);
+        root.addView(makeSwitch("ESP (caja + distancia)", bEsp, v -> {
+            bEsp = v;
+            NativeLib.toggleFeature(1, v);
+            // Agregar o remover el overlay ESP según el switch
+            if (v) attachEsp(); else detachEsp();
         }));
 
-        // Sección: Aimbot config
+        // AIMBOT CONFIG
         root.addView(sectionLabel("AIMBOT CONFIG"));
-
-        final TextView lblSmooth = makeLabel("Smoothing: " + fSmoothing);
-        root.addView(lblSmooth);
-        SeekBar sbSmooth = makeSeekBar(100, (int)(fSmoothing * 10), p -> {
+        final TextView lblS = makeLabel("Smoothing: " + fSmoothing);
+        root.addView(lblS);
+        root.addView(makeSeekBar(100, (int)(fSmoothing*10), p -> {
             fSmoothing = Math.max(1f, p / 10f);
-            lblSmooth.setText("Smoothing: " + fSmoothing);
+            lblS.setText("Smoothing: " + fSmoothing);
             NativeLib.setAimbotParam(1, fSmoothing);
-        });
-        root.addView(sbSmooth);
-
-        final TextView lblFov = makeLabel("FOV: " + (int)fFov);
-        root.addView(lblFov);
-        SeekBar sbFov = makeSeekBar(360, (int)fFov, p -> {
+        }));
+        final TextView lblF = makeLabel("FOV: " + (int)fFov);
+        root.addView(lblF);
+        root.addView(makeSeekBar(360, (int)fFov, p -> {
             fFov = Math.max(10f, p);
-            lblFov.setText("FOV: " + (int)fFov);
+            lblF.setText("FOV: " + (int)fFov);
             NativeLib.setAimbotParam(0, fFov);
-        });
-        root.addView(sbFov);
+        }));
 
-        // Cerrar
+        // UTILIDADES
+        root.addView(sectionLabel("UTILIDADES"));
+        TextView launchBtn = new TextView(this);
+        launchBtn.setText("▶  Abrir Free Fire MAX");
+        launchBtn.setTextColor(Color.parseColor("#44FF44"));
+        launchBtn.setTextSize(12f);
+        launchBtn.setPadding(0, 8, 0, 8);
+        launchBtn.setOnClickListener(x -> launchFreeFire());
+        root.addView(launchBtn);
+
         root.addView(divider());
         TextView close = new TextView(this);
-        close.setText("[ cerrar ]");
+        close.setText("✕  Cerrar menú");
         close.setTextColor(Color.parseColor("#FF4C8C"));
-        close.setTextSize(12f);
-        close.setPadding(0, 8, 0, 0);
+        close.setTextSize(11f);
+        close.setPadding(0, 6, 0, 0);
         close.setOnClickListener(x -> toggleMenu());
         root.addView(close);
 
@@ -160,24 +157,65 @@ public class OverlayService extends Service {
         menuPanel.setVisibility(View.GONE);
 
         WindowManager.LayoutParams p = new WindowManager.LayoutParams(
-            dpToPx(240),
+            dpToPx(230),
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         );
         p.gravity = Gravity.TOP | Gravity.START;
-        p.x = 8; p.y = 60;
+        p.x = 8; p.y = 55;
         wm.addView(menuPanel, p);
     }
 
+    // ── Abrir Free Fire MAX ───────────────────────────────────────────────────
+    private void launchFreeFire() {
+        try {
+            Intent launch = getPackageManager()
+                .getLaunchIntentForPackage("com.dts.freefiremax");
+            if (launch != null) {
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(launch);
+            }
+        } catch (Exception ignored) {}
+        // Cerrar menú para no tapar la pantalla
+        handler.postDelayed(() -> {
+            if (menuOpen) toggleMenu();
+        }, 500);
+    }
+
+    // ── ESP overlay ───────────────────────────────────────────────────────────
+    private void attachEsp() {
+        if (espAdded) return;
+        espView = new EspRenderer(this);
+        WindowManager.LayoutParams p = new WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSPARENT
+        );
+        wm.addView(espView, p);
+        espAdded = true;
+    }
+
+    private void detachEsp() {
+        if (!espAdded || espView == null) return;
+        wm.removeView(espView);
+        espView  = null;
+        espAdded = false;
+    }
+
     // ── Helpers UI ────────────────────────────────────────────────────────────
-    private interface OnCheck { void on(boolean v); }
-    private interface OnProgress { void on(int p); }
+    private interface OnCheck    { void on(boolean v); }
+    private interface OnProgress { void on(int p);     }
 
     private Switch makeSwitch(String label, boolean init, OnCheck cb) {
         Switch sw = new Switch(this);
-        sw.setText(label); sw.setTextColor(Color.WHITE);
+        sw.setText(label);
+        sw.setTextColor(Color.WHITE);
         sw.setChecked(init);
         sw.setOnCheckedChangeListener((v, c) -> cb.on(c));
         sw.setPadding(0, 8, 0, 8);
@@ -187,22 +225,25 @@ public class OverlayService extends Service {
     private TextView sectionLabel(String t) {
         TextView tv = new TextView(this);
         tv.setText(t);
-        tv.setTextColor(Color.parseColor("#888888"));
-        tv.setTextSize(10f);
-        tv.setPadding(0, 14, 0, 4);
+        tv.setTextColor(Color.parseColor("#777777"));
+        tv.setTextSize(9f);
+        tv.setPadding(0, 12, 0, 4);
         return tv;
     }
 
     private TextView makeLabel(String t) {
         TextView tv = new TextView(this);
-        tv.setText(t); tv.setTextColor(Color.parseColor("#AAAAAA"));
-        tv.setTextSize(11f); tv.setPadding(0, 6, 0, 2);
+        tv.setText(t);
+        tv.setTextColor(Color.parseColor("#AAAAAA"));
+        tv.setTextSize(10f);
+        tv.setPadding(0, 6, 0, 2);
         return tv;
     }
 
     private SeekBar makeSeekBar(int max, int progress, OnProgress cb) {
         SeekBar sb = new SeekBar(this);
-        sb.setMax(max); sb.setProgress(progress);
+        sb.setMax(max);
+        sb.setProgress(progress);
         sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar s, int p, boolean u) { cb.on(p); }
             public void onStartTrackingTouch(SeekBar s) {}
@@ -230,7 +271,6 @@ public class OverlayService extends Service {
         menuPanel.setVisibility(menuOpen ? View.VISIBLE : View.GONE);
     }
 
-    // ── Arrastrar con detección de click ──────────────────────────────────────
     private void makeDraggable(View v, WindowManager.LayoutParams p, Runnable onClick) {
         v.setOnTouchListener(new View.OnTouchListener() {
             int lx, ly, sx, sy;
@@ -245,7 +285,7 @@ public class OverlayService extends Service {
                         lx = (int)e.getRawX(); ly = (int)e.getRawY();
                         wm.updateViewLayout(v, p); return true;
                     case MotionEvent.ACTION_UP:
-                        if (Math.abs(e.getRawX()-sx)<12 && Math.abs(e.getRawY()-sy)<12)
+                        if (Math.abs(e.getRawX()-sx) < 12 && Math.abs(e.getRawY()-sy) < 12)
                             onClick.run();
                         return true;
                 }
@@ -257,8 +297,8 @@ public class OverlayService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (fabBtn   != null) wm.removeView(fabBtn);
-        if (menuPanel!= null) wm.removeView(menuPanel);
-        if (espView  != null) wm.removeView(espView);
+        detachEsp();
+        if (fabBtn    != null) wm.removeView(fabBtn);
+        if (menuPanel != null) wm.removeView(menuPanel);
     }
 }
