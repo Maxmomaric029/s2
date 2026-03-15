@@ -2,9 +2,9 @@ package com.dts.freefireth;
 
 import android.app.Service;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.Typeface;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -13,7 +13,6 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
@@ -26,16 +25,20 @@ public class OverlayService extends Service {
     private View          fabBtn;
     private View          menuPanel;
     private EspRenderer   espView;
-    private boolean       menuOpen   = false;
-    private boolean       espAdded   = false;
-    private final Handler handler    = new Handler(Looper.getMainLooper());
+    private boolean       menuOpen  = false;
+    private boolean       espAdded  = false;
+    private final Handler handler   = new Handler(Looper.getMainLooper());
 
-    private boolean bAimbot   = false;
-    private boolean bEsp      = false;
-    private boolean bSilent   = false;
-    private boolean bNoRecoil = false;
+    // Estados — todos desactivados por defecto
+    private boolean bAimbot    = false;
+    private boolean bEsp       = false;
+    private boolean bSilent    = false;
+    private boolean bNoRecoil  = false;
     private float   fSmoothing = 5f;
     private float   fFov       = 180f;
+
+    // Para el delay de 5 segundos
+    private Runnable pendingToggle = null;
 
     @Override public IBinder onBind(Intent i) { return null; }
 
@@ -43,26 +46,22 @@ public class OverlayService extends Service {
     public void onCreate() {
         super.onCreate();
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
-
         DisplayMetrics dm = new DisplayMetrics();
         wm.getDefaultDisplay().getRealMetrics(dm);
         NativeLib.setScreenSize(dm.widthPixels, dm.heightPixels);
-
         buildFab();
         buildMenu();
-        // EspRenderer se agrega solo cuando el usuario activa ESP
-        // para no crashear antes de que el juego cargue
     }
 
-    // ── FAB ───────────────────────────────────────────────────────────────────
+    // ── Botón flotante pequeño con indicador de estado ────────────────────────
     private void buildFab() {
         TextView btn = new TextView(this);
-        btn.setText("FF\nMOD");
-        btn.setTextColor(Color.WHITE);
-        btn.setTextSize(10f);
+        btn.setText("●");
+        btn.setTextColor(Color.parseColor("#FF4C8C"));
+        btn.setTextSize(18f);
         btn.setGravity(android.view.Gravity.CENTER);
-        btn.setBackgroundColor(Color.parseColor("#CC0A0A1A"));
-        btn.setPadding(16, 10, 16, 10);
+        btn.setBackgroundColor(Color.parseColor("#CC000010"));
+        btn.setPadding(14, 8, 14, 8);
         fabBtn = btn;
 
         WindowManager.LayoutParams p = new WindowManager.LayoutParams(
@@ -73,115 +72,99 @@ public class OverlayService extends Service {
             PixelFormat.TRANSLUCENT
         );
         p.gravity = Gravity.TOP | Gravity.START;
-        p.x = 8; p.y = 200;
+        p.x = 8; p.y = 180;
 
         makeDraggable(fabBtn, p, this::toggleMenu);
         wm.addView(fabBtn, p);
     }
 
-    // ── MENÚ ──────────────────────────────────────────────────────────────────
+    // Actualizar color del botón según si hay algún hack activo
+    private void updateFabState() {
+        boolean anyActive = bAimbot || bEsp || bSilent || bNoRecoil;
+        ((TextView) fabBtn).setTextColor(
+            anyActive ? Color.parseColor("#44FF44") : Color.parseColor("#FF4C8C")
+        );
+    }
+
+    // ── Menú minimalista ─────────────────────────────────────────────────────
     private void buildMenu() {
-        ScrollView scroll = new ScrollView(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#EE000015"));
-        root.setPadding(22, 22, 22, 22);
+        root.setBackgroundColor(Color.parseColor("#F0000010"));
+        root.setPadding(18, 18, 18, 18);
 
         // Título
         TextView title = new TextView(this);
-        title.setText("FREE FIRE MAX — MOD MENU");
+        title.setText("9B MOD");
         title.setTextColor(Color.parseColor("#FF4C8C"));
-        title.setTextSize(12f);
-        title.setPadding(0, 0, 0, 12);
+        title.setTextSize(14f);
+        title.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        title.setPadding(0, 0, 0, 14);
         root.addView(title);
 
-        // COMBAT
-        root.addView(sectionLabel("COMBAT"));
-        root.addView(makeSwitch("Aimbot", bAimbot, v -> {
-            bAimbot = v; NativeLib.toggleFeature(0, v);
-        }));
-        root.addView(makeSwitch("Silent Aim", bSilent, v -> {
-            bSilent = v; NativeLib.toggleFeature(2, v);
-        }));
-        root.addView(makeSwitch("No Recoil", bNoRecoil, v -> {
-            bNoRecoil = v; NativeLib.toggleFeature(3, v);
-        }));
+        root.addView(divider());
 
-        // VISUAL
-        root.addView(sectionLabel("VISUAL"));
-        root.addView(makeSwitch("ESP (caja + distancia)", bEsp, v -> {
-            bEsp = v;
-            NativeLib.toggleFeature(1, v);
-            // Agregar o remover el overlay ESP según el switch
-            if (v) attachEsp(); else detachEsp();
+        // Switches — todos desactivados por defecto, delay de 5s al activar
+        root.addView(buildSwitch("AIMBOT", false, on -> scheduleToggle(0, on)));
+        root.addView(buildSwitch("SILENT AIM", false, on -> scheduleToggle(2, on)));
+        root.addView(buildSwitch("NO RECOIL", false, on -> scheduleToggle(3, on)));
+        root.addView(buildSwitch("ESP", false, on -> {
+            scheduleToggle(1, on);
+            if (on) handler.postDelayed(this::attachEsp, 5000);
+            else    detachEsp();
         }));
-
-        // AIMBOT CONFIG
-        root.addView(sectionLabel("AIMBOT CONFIG"));
-        final TextView lblS = makeLabel("Smoothing: " + fSmoothing);
-        root.addView(lblS);
-        root.addView(makeSeekBar(100, (int)(fSmoothing*10), p -> {
-            fSmoothing = Math.max(1f, p / 10f);
-            lblS.setText("Smoothing: " + fSmoothing);
-            NativeLib.setAimbotParam(1, fSmoothing);
-        }));
-        final TextView lblF = makeLabel("FOV: " + (int)fFov);
-        root.addView(lblF);
-        root.addView(makeSeekBar(360, (int)fFov, p -> {
-            fFov = Math.max(10f, p);
-            lblF.setText("FOV: " + (int)fFov);
-            NativeLib.setAimbotParam(0, fFov);
-        }));
-
-        // UTILIDADES
-        root.addView(sectionLabel("UTILIDADES"));
-        TextView launchBtn = new TextView(this);
-        launchBtn.setText("▶  Abrir Free Fire MAX");
-        launchBtn.setTextColor(Color.parseColor("#44FF44"));
-        launchBtn.setTextSize(12f);
-        launchBtn.setPadding(0, 8, 0, 8);
-        launchBtn.setOnClickListener(x -> launchFreeFire());
-        root.addView(launchBtn);
 
         root.addView(divider());
+
+        // Smoothing
+        TextView lblS = label("SMOOTH  " + (int)fSmoothing);
+        root.addView(lblS);
+        SeekBar sbS = seekbar(100, (int)(fSmoothing*10), p -> {
+            fSmoothing = Math.max(1f, p / 10f);
+            lblS.setText("SMOOTH  " + (int)fSmoothing);
+            NativeLib.setAimbotParam(1, fSmoothing);
+        });
+        root.addView(sbS);
+
+        root.addView(divider());
+
+        // Cerrar
         TextView close = new TextView(this);
-        close.setText("✕  Cerrar menú");
-        close.setTextColor(Color.parseColor("#FF4C8C"));
+        close.setText("[ X ]");
+        close.setTextColor(Color.parseColor("#555555"));
         close.setTextSize(11f);
-        close.setPadding(0, 6, 0, 0);
+        close.setTypeface(Typeface.MONOSPACE);
         close.setOnClickListener(x -> toggleMenu());
         root.addView(close);
 
-        scroll.addView(root);
-        menuPanel = scroll;
+        menuPanel = root;
         menuPanel.setVisibility(View.GONE);
 
         WindowManager.LayoutParams p = new WindowManager.LayoutParams(
-            dpToPx(230),
+            dpToPx(190),
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         );
         p.gravity = Gravity.TOP | Gravity.START;
-        p.x = 8; p.y = 55;
+        p.x = 8; p.y = 50;
         wm.addView(menuPanel, p);
     }
 
-    // ── Abrir Free Fire MAX ───────────────────────────────────────────────────
-    private void launchFreeFire() {
-        try {
-            Intent launch = getPackageManager()
-                .getLaunchIntentForPackage("com.dts.freefireth");
-            if (launch != null) {
-                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(launch);
-            }
-        } catch (Exception ignored) {}
-        // Cerrar menú para no tapar la pantalla
+    // Activar un hack con delay de 5 segundos
+    private void scheduleToggle(int id, boolean on) {
         handler.postDelayed(() -> {
-            if (menuOpen) toggleMenu();
-        }, 500);
+            NativeLib.toggleFeature(id, on);
+            // Actualizar estado interno
+            switch(id) {
+                case 0: bAimbot   = on; break;
+                case 1: bEsp      = on; break;
+                case 2: bSilent   = on; break;
+                case 3: bNoRecoil = on; break;
+            }
+            updateFabState();
+        }, on ? 5000 : 0); // 5s al activar, instantáneo al desactivar
     }
 
     // ── ESP overlay ───────────────────────────────────────────────────────────
@@ -204,46 +187,38 @@ public class OverlayService extends Service {
     private void detachEsp() {
         if (!espAdded || espView == null) return;
         wm.removeView(espView);
-        espView  = null;
-        espAdded = false;
+        espView = null; espAdded = false;
     }
 
-    // ── Helpers UI ────────────────────────────────────────────────────────────
-    private interface OnCheck    { void on(boolean v); }
-    private interface OnProgress { void on(int p);     }
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    private interface OnToggle { void on(boolean v); }
+    private interface OnProg   { void on(int p);     }
 
-    private Switch makeSwitch(String label, boolean init, OnCheck cb) {
+    private Switch buildSwitch(String label, boolean init, OnToggle cb) {
         Switch sw = new Switch(this);
         sw.setText(label);
-        sw.setTextColor(Color.WHITE);
+        sw.setTextColor(Color.parseColor("#CCCCCC"));
+        sw.setTypeface(Typeface.MONOSPACE);
+        sw.setTextSize(11f);
         sw.setChecked(init);
         sw.setOnCheckedChangeListener((v, c) -> cb.on(c));
-        sw.setPadding(0, 8, 0, 8);
+        sw.setPadding(0, 10, 0, 10);
         return sw;
     }
 
-    private TextView sectionLabel(String t) {
+    private TextView label(String t) {
         TextView tv = new TextView(this);
         tv.setText(t);
-        tv.setTextColor(Color.parseColor("#777777"));
-        tv.setTextSize(9f);
-        tv.setPadding(0, 12, 0, 4);
-        return tv;
-    }
-
-    private TextView makeLabel(String t) {
-        TextView tv = new TextView(this);
-        tv.setText(t);
-        tv.setTextColor(Color.parseColor("#AAAAAA"));
+        tv.setTextColor(Color.parseColor("#666666"));
+        tv.setTypeface(Typeface.MONOSPACE);
         tv.setTextSize(10f);
         tv.setPadding(0, 6, 0, 2);
         return tv;
     }
 
-    private SeekBar makeSeekBar(int max, int progress, OnProgress cb) {
+    private SeekBar seekbar(int max, int prog, OnProg cb) {
         SeekBar sb = new SeekBar(this);
-        sb.setMax(max);
-        sb.setProgress(progress);
+        sb.setMax(max); sb.setProgress(prog);
         sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar s, int p, boolean u) { cb.on(p); }
             public void onStartTrackingTouch(SeekBar s) {}
@@ -256,9 +231,9 @@ public class OverlayService extends Service {
         View v = new View(this);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, 1);
-        lp.setMargins(0, 10, 0, 10);
+        lp.setMargins(0, 8, 0, 8);
         v.setLayoutParams(lp);
-        v.setBackgroundColor(Color.parseColor("#33FFFFFF"));
+        v.setBackgroundColor(Color.parseColor("#22FFFFFF"));
         return v;
     }
 
@@ -277,15 +252,14 @@ public class OverlayService extends Service {
             public boolean onTouch(View vv, MotionEvent e) {
                 switch (e.getAction()) {
                     case MotionEvent.ACTION_DOWN:
-                        lx = (int)e.getRawX(); ly = (int)e.getRawY();
-                        sx = lx; sy = ly; return true;
+                        lx=(int)e.getRawX(); ly=(int)e.getRawY();
+                        sx=lx; sy=ly; return true;
                     case MotionEvent.ACTION_MOVE:
-                        p.x += (int)e.getRawX() - lx;
-                        p.y += (int)e.getRawY() - ly;
-                        lx = (int)e.getRawX(); ly = (int)e.getRawY();
+                        p.x+=(int)e.getRawX()-lx; p.y+=(int)e.getRawY()-ly;
+                        lx=(int)e.getRawX(); ly=(int)e.getRawY();
                         wm.updateViewLayout(v, p); return true;
                     case MotionEvent.ACTION_UP:
-                        if (Math.abs(e.getRawX()-sx) < 12 && Math.abs(e.getRawY()-sy) < 12)
+                        if (Math.abs(e.getRawX()-sx)<12 && Math.abs(e.getRawY()-sy)<12)
                             onClick.run();
                         return true;
                 }
