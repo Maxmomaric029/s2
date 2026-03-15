@@ -256,18 +256,11 @@ static void hook_Update(void* instance) {
 //  HILO DE INICIALIZACIÓN
 // =============================================================================
 static void* hack_thread(void*) {
-    LOGD("Buscando proceso com.dts.freefireth...");
+    LOGD("Iniciando mod interno...");
 
-    // Buscar el PID del proceso de Free Fire
-    while (MemoryUtils::targetPid <= 0) {
-        MemoryUtils::targetPid = MemoryUtils::findProcessPid("com.dts.freefireth");
-        if (MemoryUtils::targetPid <= 0) sleep(2);
-    }
-    LOGD("PID encontrado: %d", MemoryUtils::targetPid);
-
-    // Leer la base de libil2cpp.so desde el espacio de memoria de FF
+    // Leer base de libil2cpp.so desde /proc/self/maps (mismo proceso)
     while ((gBase = MemoryUtils::getLibraryBase("libil2cpp.so")) == 0) sleep(1);
-    LOGD("Base libil2cpp.so: %p", reinterpret_cast<void*>(gBase));
+    LOGD("Base: %p", reinterpret_cast<void*>(gBase));
 
     LOGD("Iniciando loop sin hook...");
 
