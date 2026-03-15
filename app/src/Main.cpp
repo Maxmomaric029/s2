@@ -269,17 +269,41 @@ static void* hack_thread(void*) {
     while ((gBase = MemoryUtils::getLibraryBase("libil2cpp.so")) == 0) sleep(1);
     LOGD("Base libil2cpp.so: %p", reinterpret_cast<void*>(gBase));
 
-    if (Global.Player_Update_Func == 0x0) {
-        LOGE("Player_Update_Func = 0x0 en Global.h — hook omitido. Pon el offset real.");
-        return nullptr;
-    }
+    LOGD("Iniciando loop sin hook...");
 
-    void* addr = reinterpret_cast<void*>(gBase + Global.Player_Update_Func);
-    int   res  = DobbyHook(addr,
-                           reinterpret_cast<void*>(hook_Update),
-                           reinterpret_cast<void**>(&old_Update));
-    if (res == 0) LOGD("Hook instalado en %p", addr);
-    else { LOGE("DobbyHook fallo ret=%d", res); old_Update = nullptr; }
+    // Loop principal — corre cada 16ms (~60fps) sin necesitar hook
+    while (true) {
+        uintptr_t lp = GetLocalPlayer();
+
+        if (lp) {
+            std::vector<EspEntry> espEntries;
+            BestTarget best = ProcessEntities(lp, espEntries);
+
+            // No Recoil
+            if (Menu::noRecoil) {
+                uintptr_t weapon = MemoryUtils::Read<uintptr_t>(lp + Global.Weapon);
+                if (MemoryUtils::IsValidPtr(weapon)) {
+                    uintptr_t data = MemoryUtils::Read<uintptr_t>(weapon + Global.WeaponData);
+                    if (MemoryUtils::IsValidPtr(data))
+                        MemoryUtils::Write<float>(data + Global.WeaponRecoil, 0.0f);
+                }
+            }
+
+            // Silent Aim
+            if (Menu::silentAim && best.addr)
+                ApplySilentAim(lp, best.headPos);
+
+            // Aimbot
+            if (Menu::aimbot && best.addr)
+                ApplyAimbot(lp, best.headPos);
+
+            // ESP
+            if (Menu::esp && !espEntries.empty())
+                EspBridge::PushEspData(espEntries);
+        }
+
+        usleep(16000); // ~60fps
+    }
 
     return nullptr;
 }
@@ -317,7 +341,19 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
     JNIEnv* env;
     if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
         return JNI_ERR;
-    EspBridge::Init(env, vm);
+
+    // EspBridge::Init busca EspRenderer — solo inicializar si la clase existe
+    // En mod interno (inyectado en FF) esa clase no existe, asi que lo saltamos
+    // por ahora hasta que implementemos el overlay dentro del proceso de FF
+    jclass espClass = env->FindClass("com/dts/freefireth/EspRenderer");
+    if (espClass) {
+        // Solo inicializar ESP si la clase existe (cuando corre como APK externo)
+        EspBridge::Init(env, vm);
+        env->DeleteLocalRef(espClass);
+    }
+    // Limpiar cualquier excepcion pendiente de FindClass
+    if (env->ExceptionCheck()) env->ExceptionClear();
+
     pthread_t pt;
     pthread_create(&pt, nullptr, hack_thread, nullptr);
     return JNI_VERSION_1_6;
